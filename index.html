@@ -1,0 +1,1029 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>进士录与 CBDB 匹配工作流程</title>
+  <style>
+    :root {
+      --ink: #1e252b;
+      --muted: #65717d;
+      --line: #d5dde5;
+      --panel: #f6f8fa;
+      --panel-strong: #eef4f8;
+      --paper: #ffffff;
+      --page: #f3f6f8;
+      --accent: #126b8f;
+      --accent-2: #3b7d5b;
+      --accent-soft: #e8f4f7;
+      --accent-line: #a9cbd6;
+      --warn: #8b5e00;
+      --warn-soft: #fff4d6;
+      --ok: #196c48;
+      --ok-soft: #e7f4ed;
+      --shadow: 0 18px 48px rgba(31, 45, 61, .10);
+      --shadow-soft: 0 10px 26px rgba(31, 45, 61, .08);
+      --radius: 8px;
+      --bg-pattern:
+        linear-gradient(90deg, rgba(18, 107, 143, .06) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(18, 107, 143, .05) 1px, transparent 1px);
+    }
+    body[data-theme="archive"] {
+      --ink: #25231f;
+      --muted: #766e63;
+      --line: #d7cab7;
+      --panel: #f8f4ec;
+      --panel-strong: #efe3d0;
+      --paper: #fffaf1;
+      --page: #f1eadf;
+      --accent: #93652c;
+      --accent-2: #2f6f5f;
+      --accent-soft: #f1e2cc;
+      --accent-line: #c7a579;
+      --warn: #915b00;
+      --warn-soft: #fff0c8;
+      --ok: #3f7259;
+      --ok-soft: #e8f0e5;
+      --shadow: 0 18px 46px rgba(77, 55, 28, .12);
+      --shadow-soft: 0 10px 24px rgba(77, 55, 28, .09);
+      --bg-pattern:
+        linear-gradient(90deg, rgba(147, 101, 44, .08) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(147, 101, 44, .07) 1px, transparent 1px);
+    }
+    body[data-theme="slate"] {
+      --ink: #ecf3f8;
+      --muted: #a9bac7;
+      --line: #334858;
+      --panel: #182734;
+      --panel-strong: #203545;
+      --paper: #101b24;
+      --page: #0d151d;
+      --accent: #66c7dd;
+      --accent-2: #9dcf72;
+      --accent-soft: #183646;
+      --accent-line: #3c7180;
+      --warn: #f4ca64;
+      --warn-soft: #3a2f16;
+      --ok: #9fd9b6;
+      --ok-soft: #173628;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .28);
+      --shadow-soft: 0 10px 26px rgba(0, 0, 0, .22);
+      --bg-pattern:
+        linear-gradient(90deg, rgba(102, 199, 221, .08) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(102, 199, 221, .06) 1px, transparent 1px);
+    }
+    body[data-theme="clear"] {
+      --ink: #172027;
+      --muted: #596875;
+      --line: #d8e1e8;
+      --panel: #f7fafc;
+      --panel-strong: #edf5f8;
+      --paper: #ffffff;
+      --page: #f8fafb;
+      --accent: #146f7e;
+      --accent-2: #ca663a;
+      --accent-soft: #e7f5f7;
+      --accent-line: #a8d3da;
+      --warn: #986111;
+      --warn-soft: #fff3da;
+      --ok: #257152;
+      --ok-soft: #e8f5ee;
+      --shadow: 0 16px 40px rgba(23, 32, 39, .08);
+      --shadow-soft: 0 8px 20px rgba(23, 32, 39, .07);
+      --bg-pattern:
+        linear-gradient(90deg, rgba(20, 111, 126, .05) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(20, 111, 126, .045) 1px, transparent 1px);
+    }
+    * { box-sizing: border-box; }
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 22px;
+    }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at 50% -10%, var(--panel-strong), transparent 34rem),
+        var(--bg-pattern),
+        var(--page);
+      background-size: auto, 28px 28px, auto;
+      line-height: 1.55;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 30px;
+      width: min(1440px, calc(100% - 40px));
+      margin: 0 auto;
+      align-items: start;
+    }
+    .sidebar {
+      position: sticky;
+      top: 18px;
+      height: calc(100vh - 36px);
+      padding: 18px 14px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--paper) 92%, transparent);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(18px);
+      overflow: auto;
+    }
+    .sidebar-title {
+      margin: 0 0 12px;
+      padding: 0 8px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 15px;
+      font-weight: 720;
+    }
+    .toc-group {
+      margin: 14px 8px 6px;
+      color: #7b8490;
+      font-size: 11px;
+      font-weight: 720;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .toc {
+      display: grid;
+      gap: 4px;
+    }
+    .toc a {
+      display: block;
+      padding: 8px 9px;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      text-decoration: none;
+      transition: background .18s ease, color .18s ease, transform .18s ease;
+    }
+    .toc a:hover,
+    .toc a.active {
+      color: var(--accent);
+      background: var(--accent-soft);
+      transform: translateX(2px);
+    }
+    main {
+      width: 100%;
+      margin: 28px 0 56px;
+    }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 22px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--paper) 94%, transparent);
+      box-shadow: var(--shadow);
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 5px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    }
+    .hero-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 22px;
+    }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 780;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0 0 8px;
+      max-width: 820px;
+      font-size: clamp(30px, 4vw, 48px);
+      font-weight: 780;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+    .theme-panel {
+      flex: 0 0 310px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      background: var(--panel);
+    }
+    .theme-panel-label {
+      display: block;
+      margin: 0 0 9px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .theme-options {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .theme-button {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 8px;
+      align-items: center;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 7px 8px;
+      color: var(--ink);
+      background: var(--paper);
+      font: inherit;
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .theme-button:hover,
+    .theme-button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, var(--swatch-a), var(--swatch-b));
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0 24px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--muted);
+      background: var(--panel);
+      font-size: 13px;
+    }
+    .lead {
+      margin: 0 0 28px;
+      max-width: 900px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: 1.35fr repeat(3, minmax(0, .7fr));
+      gap: 14px;
+      margin: 18px 0 22px;
+    }
+    .summary-card {
+      border: 1px solid var(--accent-line);
+      border-radius: var(--radius);
+      padding: 16px;
+      background: var(--accent-soft);
+      box-shadow: var(--shadow-soft);
+    }
+    .summary-card.neutral {
+      border-color: var(--line);
+      background: var(--paper);
+    }
+    .summary-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+    .summary-card .number {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+      font-size: 24px;
+      font-weight: 760;
+      line-height: 1.1;
+    }
+    .summary-card span,
+    .summary-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .process-map {
+      margin: 18px 0 26px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+    .process-map h2 {
+      margin: 0 0 14px;
+      font-size: 17px;
+    }
+    .process-steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      position: relative;
+    }
+    .process-node {
+      min-height: 94px;
+      padding: 13px;
+      border: 1px solid var(--accent-line);
+      border-radius: var(--radius);
+      background: var(--accent-soft);
+    }
+    .process-node strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+    .process-node span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .part-divider {
+      margin: 38px 0 12px;
+      padding: 11px 0 0;
+      border-top: 2px solid color-mix(in srgb, var(--accent) 72%, var(--line));
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 760;
+      letter-spacing: .04em;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      align-items: stretch;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      background: var(--panel);
+      min-height: 118px;
+      box-shadow: var(--shadow-soft);
+    }
+    .card h2, .section h2 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      line-height: 1.35;
+    }
+    .card p, .card ul, .section p, .section ul {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    ul { padding-left: 18px; }
+    li + li { margin-top: 4px; }
+    .arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 18px;
+      min-height: 34px;
+    }
+    .wide {
+      grid-column: 1 / -1;
+    }
+    .section {
+      margin-top: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px;
+      background: color-mix(in srgb, var(--paper) 96%, transparent);
+      box-shadow: var(--shadow-soft);
+      scroll-margin-top: 22px;
+      overflow-x: auto;
+    }
+    .section-intro {
+      margin: -2px 0 14px;
+      max-width: 920px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .note {
+      margin: 14px 0 0;
+      padding: 12px 14px;
+      border: 1px solid var(--accent-line);
+      border-radius: var(--radius);
+      color: var(--muted);
+      background: var(--accent-soft);
+      font-size: 14px;
+    }
+    .note.warn {
+      border-color: #e5c46e;
+      background: var(--warn-soft);
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 44px 1fr 44px 1fr;
+      gap: 0;
+      align-items: center;
+      margin-top: 12px;
+    }
+    .step {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      min-height: 118px;
+      background: var(--paper);
+      box-shadow: var(--shadow-soft);
+    }
+    .step strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+    .step span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .accent { background: var(--accent-soft); border-color: var(--accent-line); }
+    .ok { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 36%, var(--line)); }
+    .warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 36%, var(--line)); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--paper);
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 11px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--ink);
+      background: var(--panel-strong);
+      font-weight: 650;
+    }
+    tbody tr:nth-child(even) td {
+      background: color-mix(in srgb, var(--panel) 58%, transparent);
+    }
+    tbody tr:hover td {
+      background: var(--accent-soft);
+    }
+    tr:last-child td {
+      border-bottom: 0;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: var(--panel-strong);
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 13px;
+    }
+    body[data-theme="slate"] .hero,
+    body[data-theme="slate"] .sidebar,
+    body[data-theme="slate"] .section {
+      background: color-mix(in srgb, var(--paper) 90%, transparent);
+    }
+    @media (max-width: 860px) {
+      .layout {
+        display: block;
+        width: min(100% - 28px, 1180px);
+      }
+      .sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        height: auto;
+        max-height: 42vh;
+        margin-top: 12px;
+      }
+      main {
+        margin-top: 20px;
+      }
+      .hero {
+        padding: 22px 18px;
+      }
+      .hero-top {
+        display: block;
+      }
+      .theme-panel {
+        margin-top: 18px;
+        width: 100%;
+        max-width: none;
+      }
+      .grid, .flow {
+        display: block;
+      }
+      .summary {
+        display: block;
+      }
+      .process-steps {
+        display: block;
+      }
+      .process-node {
+        margin-bottom: 10px;
+      }
+      .summary-card {
+        margin-bottom: 12px;
+      }
+      .card, .step, .section {
+        margin-bottom: 12px;
+      }
+      table {
+        min-width: 680px;
+      }
+      .arrow {
+        transform: rotate(90deg);
+      }
+    }
+  </style>
+</head>
+<body data-theme="clear">
+<div class="layout">
+  <aside class="sidebar" aria-label="工作流程目录">
+    <div class="sidebar-title">目录</div>
+    <nav class="toc">
+      <div class="toc-group">一、整体思路</div>
+      <a href="#overview" class="active">页面概览</a>
+      <a href="#main-flow">整体流程</a>
+      <a href="#round-operations">匹配策略与步骤</a>
+      <div class="toc-group">二、匹配规则</div>
+      <a href="#entry-years">年份+朝代模糊匹配规则</a>
+      <a href="#duplicate-selection">重名处理规则</a>
+      <a href="#rounds">匹配轮次解释</a>
+      <a href="#statuses">匹配状态说明</a>
+      <div class="toc-group">三、输出结果</div>
+      <a href="#outputs">输出文件说明</a>
+      <a href="#report">report 表说明</a>
+      <a href="#ambiguous">ambiguous 和未匹配</a>
+      <div class="toc-group">四、例子</div>
+      <a href="#wangpu">例子：王朴</a>
+    </nav>
+  </aside>
+<main id="overview">
+  <section class="hero" aria-labelledby="page-title">
+    <div class="hero-top">
+      <div>
+        <p class="eyebrow">ID Matching Workflow</p>
+        <h1 id="page-title">进士录与 CBDB 人物匹配工作流程</h1>
+        <p class="lead">目标：以进士录为基准，将 CBDB 人物尽可能准确地贴合到进士 id，并保留可审计的候选、得分、歧义和冲突记录。</p>
+      </div>
+    </div>
+    <div class="meta">
+      <span class="pill">主表口径：进士录</span>
+      <span class="pill">姓名精确匹配 + 年份/朝代验证</span>
+      <span class="pill">输出含候选、选中、歧义与报告表</span>
+    </div>
+
+    <div class="summary">
+      <div class="summary-card">
+        <strong>方法摘要</strong>
+        <p>先清洗两套人物姓名并生成统一姓名键；唯一名对唯一名直接匹配；所有涉及重名的候选再用进士年份、CBDB entry 年份、朝代兼容关系分轮筛选。无法唯一确认的记录保留为 ambiguous，跨记录共享同一 CBDB 人物的记录标为 conflict。</p>
+      </div>
+      <div class="summary-card neutral">
+        <span class="number">91,749</span>
+        <span>进士录主表记录数</span>
+      </div>
+      <div class="summary-card neutral">
+        <span class="number">87.50%</span>
+        <span>含 conflict 的自动贴合率</span>
+      </div>
+      <div class="summary-card neutral">
+        <span class="number">84.90%</span>
+        <span>排除 conflict 的强匹配率</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div class="card">
+      <h2>使用的数据</h2>
+      <ul>
+        <li><code>JINSHI.dta</code></li>
+        <li><code>BIOG_MAIN_Original.dta</code></li>
+        <li><code>ENTRY_DATA_Original.dta</code></li>
+        <li><code>ENTRY_CODES.dta</code></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>姓名怎么统一</h2>
+      <p>清洗姓名，CBDB 繁体转简体，去除空白，生成统一的 <code>match_key</code>。</p>
+    </div>
+    <div class="card">
+      <h2>一条记录代表谁</h2>
+      <p>一个 <code>jinshi_id</code> 代表一个进士记录；一个 <code>c_personid</code> 代表一个 CBDB 人物。</p>
+    </div>
+  </div>
+
+  <div class="part-divider">一、整体思路</div>
+
+  <div class="section" id="main-flow">
+    <h2>整体流程</h2>
+    <p class="section-intro">这一部分说明从原始数据到最终进士主表的总体路径。每一步都产生中间文件，便于回溯和人工复核。</p>
+    <div class="flow">
+      <div class="step accent">
+        <strong>1. 清洗两边人物表</strong>
+        <span>生成进士清洗表与 CBDB 人物清洗表，标记姓名唯一、姓名重名、id 重复、缺失姓名。</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step accent">
+        <strong>2. 清洗 ENTRY 证据</strong>
+        <span>只抽取进士相关 entry 年份：<code>29/36/37/44</code>。这些代码平等参与匹配。</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step accent">
+        <strong>3. 按姓名构造候选</strong>
+        <span>保留 name matched、JINSHI only、CBDB only，并按两边姓名唯一性分层。</span>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="step ok">
+        <strong>4. 唯一名直接匹配</strong>
+        <span>进士姓名唯一且 CBDB 姓名唯一时，直接选中，标记为 <code>name_only_unique_unique</code>。</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step warn">
+        <strong>5. 涉及重名则二次验证</strong>
+        <span>按朝代兼容与年份差分轮筛选：精确年份、±10 年、±50 年。</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step warn">
+        <strong>6. 歧义与冲突单独保留</strong>
+        <span>任何涉及重名的类别，只要无法唯一选出 CBDB 人物，都进入 ambiguous；同一 CBDB 人物匹配多个进士标记 conflict。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="round-operations">
+    <h2>匹配策略与步骤</h2>
+    <p class="section-intro">下面按实际数据操作顺序展开，重点说明在哪一步清洗、在哪一步按姓名合并、在哪一步加入年份证据，以及最终如何把 CBDB 数据贴回进士录。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>步骤</th>
+          <th>具体操作</th>
+          <th>生成/使用的表</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>0. 清洗输入</td>
+          <td>清洗 <code>JINSHI.dta</code> 的姓名、朝代、年份，生成 <code>jinshi_id</code>、<code>match_key</code>、<code>jinshi_year</code>、<code>jinshi_dy</code>，并标记姓名是否唯一。</td>
+          <td><code>IDMatch_v3_jinshi_clean.dta</code></td>
+        </tr>
+        <tr>
+          <td>0. 清洗输入</td>
+          <td>清洗 <code>BIOG_MAIN_Original.dta</code>，将 <code>c_name_chn</code> 转简体，生成 <code>match_key</code>，保留 <code>c_personid</code>、<code>c_dy</code>、<code>c_index_year</code>、生卒年，并标记姓名是否唯一。</td>
+          <td><code>IDMatch_v3_cbdb_person_clean.dta</code></td>
+        </tr>
+        <tr>
+          <td>0. 清洗 ENTRY</td>
+          <td>从 <code>ENTRY_DATA_Original.dta</code> 中保留 <code>c_entry_code in 29,36,37,44</code> 的记录和有效 <code>c_year</code>。这些是进士相关 entry，地位平等。</td>
+          <td><code>IDMatch_v3_entry_jinshi_evidence.dta</code></td>
+        </tr>
+        <tr>
+          <td>1. 第一轮唯一名匹配</td>
+          <td>先取进士中 <code>jinshi_name_unique == 1</code> 的记录；再取 CBDB 中 <code>cbdb_name_unique == 1</code> 的记录；以进士表为基准，按 <code>match_key</code> 做 <code>merge 1:1</code>。<code>_merge == 3</code> 的记录直接选中。</td>
+          <td>进入 <code>IDMatch_v3_selected_matches.dta</code>，标记 <code>match_round = 0</code> 和 <code>final_match_type = name_only_unique_unique</code>。</td>
+        </tr>
+        <tr>
+          <td>2. 保留第一轮未匹配者</td>
+          <td><code>_merge == 1</code> 是唯一名进士但 CBDB 没有唯一名匹配；<code>_merge == 2</code> 是唯一名 CBDB 但进士侧没有唯一名匹配。它们不丢弃，会进入后续候选分类或覆盖率报告。</td>
+          <td>记录在 <code>IDMatch_v3_name_candidates_all.dta</code>。</td>
+        </tr>
+        <tr>
+          <td>3. 构造涉及重名的候选</td>
+          <td>分别处理三类：进士重名 × CBDB 唯一名、进士唯一名 × CBDB 重名、进士重名 × CBDB 重名。三类都必须经过年份和朝代二次验证；即使前两类只有一边重名，也可能因为年份缺失或并列最佳而无法自动选出唯一匹配。</td>
+          <td>先进入 <code>IDMatch_v3_name_candidates_all.dta</code>，再压缩成候选对。</td>
+        </tr>
+        <tr>
+          <td>4. 加入年份证据</td>
+          <td>把候选对按 <code>c_personid</code> 连接到 <code>IDMatch_v3_entry_jinshi_evidence.dta</code>，先计算 <code>abs(jinshi_year - c_year)</code>。如果可用 <code>c_year</code> 不足以判断，再使用 <code>abs(jinshi_year - c_index_year)</code> 作为补充时代证据。</td>
+          <td><code>IDMatch_v3_candidate_pairs_scored.dta</code></td>
+        </tr>
+        <tr>
+          <td>5. 重名二次筛选</td>
+          <td>只对未在第一轮选中的进士操作。按朝代兼容 + 年份规则依次筛：精确年份、±10 年、±50 年。三类重名候选都执行同一规则；若同一 <code>jinshi_id</code> 只有一个最佳 <code>c_personid</code>，选中；若没有年份证据或最佳候选并列，进入 ambiguous。</td>
+          <td>选中者进入 <code>IDMatch_v3_selected_matches.dta</code>；并列者进入 <code>IDMatch_v3_ambiguous_candidates.dta</code>。</td>
+        </tr>
+        <tr>
+          <td>6. 输出进士主表</td>
+          <td>以进士录清洗表为基准，按 <code>jinshi_id</code> 连接最终选中匹配和 CBDB 人物字段，把 <code>c_personid</code>、CBDB 姓名、朝代、年份等贴回每条进士记录。</td>
+          <td><code>IDMatch_v3_jinshi_with_cbdb.dta</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="part-divider">二、匹配规则</div>
+
+  <div class="section" id="entry-years">
+    <h2>年份+朝代模糊匹配规则</h2>
+    <p class="section-intro">进士录中的“公元年”和 CBDB 进士相关 entry 的 <code>c_year</code> 语义最接近，因此优先用 <code>c_year</code> 验证重名候选；<code>c_index_year</code> 只作为 <code>c_year</code> 不可用时的补充时代证据。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>证据</th>
+          <th>ENTRY 条件</th>
+          <th>用途</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>进士相关入仕年份</td>
+          <td><code>c_entry_code in 29, 36, 37, 44</code></td>
+          <td>这些代码按人工整理结果平等处理，均可作为进士相关 <code>c_year</code> 证据。</td>
+        </tr>
+        <tr>
+          <td>入仕年份差</td>
+          <td><code>diff_entry_year = abs(jinshi_year - c_year)</code></td>
+          <td>这是重名筛选的主年份证据，因为进士录“公元年”和 CBDB entry 入仕年份语义相同。当前数据中进士相关 entry 共 98,366 条，其中 88,363 条有有效 <code>c_year</code>，有效率 89.83%。</td>
+        </tr>
+        <tr>
+          <td>人物索引年份差</td>
+          <td><code>diff_index_year = abs(jinshi_year - c_index_year)</code></td>
+          <td>作为补充时代证据。按人物统计，96,239 个有进士相关 entry 的 CBDB 人物中，87,971 人有有效 <code>c_year</code>，有效率 91.41%；缺 <code>c_year</code> 但有 <code>c_index_year</code> 的人物有 1,585 人，占 1.65%。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section" id="duplicate-selection">
+    <h2>重名处理规则</h2>
+    <p class="section-intro">所有涉及重名的候选都必须经过二次验证。无论是“进士重名 × CBDB 唯一名”、还是“进士唯一名 × CBDB 重名”、或“两边都重名”，只要不能唯一确认，就不强行归入强匹配。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>轮次</th>
+          <th>规则</th>
+          <th>选择原则</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Round 1</td>
+          <td>朝代兼容 + 年份完全相同</td>
+          <td>若同一 <code>jinshi_id</code> 只有一个最佳 <code>c_personid</code>，选中；否则 ambiguous。</td>
+        </tr>
+        <tr>
+          <td>Round 2</td>
+          <td>朝代兼容 + 年份差 ≤ 10</td>
+          <td>只处理前一轮未匹配者，仍按最佳年份差选一人。</td>
+        </tr>
+        <tr>
+          <td>Round 3</td>
+          <td>朝代兼容 + 年份差 ≤ 50</td>
+          <td>作为宽松补充，选中结果在 <code>IDMatch_v3_selected_matches.dta</code> 和 <code>IDMatch_v3_candidate_pairs_scored.dta</code> 中用 <code>match_round</code>、<code>match_rule</code>、<code>year_source</code> 单独标记；无法唯一选择的候选进入 ambiguous。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section" id="rounds">
+    <h2>匹配轮次解释</h2>
+    <p class="section-intro"><code>match_round</code> 记录一条自动匹配是在哪一轮被选中的。数值越靠前，证据通常越强；<code>match_round = .</code> 表示没有进入自动选中结果。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>变量/状态</th>
+          <th>含义</th>
+          <th>解释</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>match_round = 0</code></td>
+          <td>唯一名直接匹配</td>
+          <td>进士唯一名 × CBDB 唯一名，按姓名直接选中，不要求年份二次验证。</td>
+        </tr>
+        <tr>
+          <td><code>match_round = 1</code></td>
+          <td><code>c_year</code> 精确匹配</td>
+          <td>重名候选中，进士录 <code>公元年</code> 与 CBDB 进士相关 entry 的 <code>c_year</code> 完全相同。</td>
+        </tr>
+        <tr>
+          <td><code>match_round = 2</code></td>
+          <td><code>c_year</code> 差值 ≤ 10</td>
+          <td>上一轮未匹配者中，使用 <code>c_year</code> 小范围年份匹配。</td>
+        </tr>
+        <tr>
+          <td><code>match_round = 3</code></td>
+          <td><code>c_year</code> 差值 ≤ 50</td>
+          <td>上一轮未匹配者中，使用 <code>c_year</code> 中范围年份匹配。</td>
+        </tr>
+        <tr>
+          <td><code>match_round = 4</code></td>
+          <td><code>c_index_year</code> 精确兜底</td>
+          <td>仅当 <code>c_year</code> 不可用时，使用 <code>c_index_year</code> 作为补充时代证据。</td>
+        </tr>
+        <tr>
+          <td><code>match_round = 5</code></td>
+          <td><code>c_index_year</code> 差值 ≤ 10</td>
+          <td><code>c_year</code> 不可用时的 index year 小范围兜底。</td>
+        </tr>
+        <tr>
+          <td><code>match_round = 6</code></td>
+          <td><code>c_index_year</code> 差值 ≤ 50</td>
+          <td><code>c_year</code> 不可用时的 index year 中范围兜底。</td>
+        </tr>
+        <tr>
+          <td><code>match_round = .</code></td>
+          <td>未自动选中</td>
+          <td>没有进入最终 selected，通常出现在 unmatched 或 ambiguous 候选中。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section" id="statuses">
+    <h2>匹配状态说明</h2>
+    <p class="section-intro">这四个状态用于区分“已自动匹配”“自动匹配但存在跨记录冲突”“有候选但无法唯一确认”和“没有自动匹配结果”。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>状态</th>
+          <th>进入主表的方式</th>
+          <th>是否建议直接当强匹配</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>selected</code></td>
+          <td>候选对先在 <code>IDMatch_v3_candidate_pairs_scored.dta</code> 中通过某轮规则，被标记为 <code>final_selected = 1</code>，再进入 <code>IDMatch_v3_selected_matches.dta</code>，最后按 <code>jinshi_uid</code> 贴回进士主表。</td>
+          <td>可以作为普通自动匹配使用；若同时没有 conflict，则 <code>strong_match = 1</code>。</td>
+        </tr>
+        <tr>
+          <td><code>conflict</code></td>
+          <td>先被自动选中并进入 <code>selected_matches</code>；随后程序发现同一个 <code>c_personid</code> 被多个 <code>jinshi_uid</code> 选中，于是把状态改为 <code>conflict</code>，再贴回主表。</td>
+          <td>不建议直接当强匹配；它满足单条进士记录的筛选机制，但存在跨记录重复占用，需要复核。主表中已经设置 <code>strong_match = 0</code>。</td>
+        </tr>
+        <tr>
+          <td><code>ambiguous</code></td>
+          <td>在单条进士记录内部无法唯一选出一个 CBDB 人，或所有规则后仍不能确认。它进入 <code>IDMatch_v3_ambiguous_candidates.dta</code>，不作为强匹配贴入主表。</td>
+          <td>需要人工判断。</td>
+        </tr>
+        <tr>
+          <td><code>unmatched</code></td>
+          <td>最终没有自动匹配结果。可能完全没有姓名候选，也可能有 ambiguous 候选但未被自动选中。</td>
+          <td>不能当匹配使用。</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note warn">当前主表状态分布：<code>selected</code> 77,891 条，<code>conflict</code> 2,392 条，<code>unmatched</code> 11,466 条。若把 conflict 也算“已贴上 CBDB 但需复核”，匹配率为 87.50%；若只算非 conflict 的强匹配，匹配率为 84.90%。主表中已经加入 <code>strong_match</code>，定义为 <code>final_match_status == "selected"</code> 且不是 conflict。</p>
+  </div>
+
+
+  <div class="part-divider">三、输出结果</div>
+
+  <div class="section" id="outputs">
+    <h2>输出文件说明</h2>
+    <p class="section-intro">输出文件分为三类：清洗输入表、匹配过程表、最终结果表。最终主表是进士录口径，即把 CBDB 信息贴回每条进士记录。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>文件</th>
+          <th>作用</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>IDMatch_v3_jinshi_clean.dta</code></td><td>进士录清洗表。</td></tr>
+        <tr><td><code>IDMatch_v3_cbdb_person_clean.dta</code></td><td>CBDB 人物清洗表。</td></tr>
+        <tr><td><code>IDMatch_v3_entry_jinshi_evidence.dta</code></td><td>进士相关 ENTRY 年份证据表。</td></tr>
+        <tr><td><code>IDMatch_v3_name_candidates_all.dta</code></td><td>按姓名生成的全部候选与 only 记录。</td></tr>
+        <tr><td><code>IDMatch_v3_candidate_pairs_scored.dta</code></td><td>一行一个进士-CBDB 候选对，含年份、朝代、轮次和得分。</td></tr>
+        <tr><td><code>IDMatch_v3_selected_matches.dta</code></td><td>最终自动选中的匹配对。</td></tr>
+        <tr><td><code>IDMatch_v3_ambiguous_candidates.dta</code></td><td>无法自动唯一判断的候选。</td></tr>
+        <tr><td><code>IDMatch_v3_jinshi_with_cbdb.dta</code></td><td>进士录层最终主结果，把 CBDB 数据贴到进士记录上。</td></tr>
+        <tr><td><code>IDMatch_v3_match_report.dta</code></td><td>随数据保存的统计报告表，每一轮记录输入数、候选数、选中数、ambiguous 数、损失数。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section" id="report">
+    <h2>report 表说明</h2>
+    <p class="section-intro"><code>IDMatch_v3_match_report.dta</code> 是随数据保存的流程统计表，不是人物数据本身。它记录每一步的输入规模、候选数量、选中数量、歧义数量和剩余数量，用来回答“每一轮损失了多少”。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>字段</th>
+          <th>含义</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>step</code></td><td>当前流程步骤。</td></tr>
+        <tr><td><code>rule</code></td><td>当前步骤使用的规则。</td></tr>
+        <tr><td><code>input_n</code></td><td>这一阶段的输入规模。</td></tr>
+        <tr><td><code>candidate_n</code></td><td>这一阶段符合条件的候选数量。</td></tr>
+        <tr><td><code>selected_n</code></td><td>这一阶段自动选中的数量。</td></tr>
+        <tr><td><code>ambiguous_n</code></td><td>这一阶段进入歧义或并列的数量。</td></tr>
+        <tr><td><code>remaining_n</code></td><td>这一阶段后仍未匹配或未解决的数量。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section" id="ambiguous">
+    <h2>ambiguous 和未匹配</h2>
+    <p class="section-intro">ambiguous 不等于完全没有候选。它表示有同名候选，但自动规则无法唯一确认；未匹配则是最终主表中没有贴上 CBDB 人物。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>口径</th>
+          <th>数量</th>
+          <th>含义</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>最终未自动匹配</td>
+          <td>11,466</td>
+          <td>最终进士主表中没有贴上 <code>c_personid</code> 的记录。</td>
+        </tr>
+        <tr>
+          <td>未匹配但有 ambiguous 候选</td>
+          <td>5,368</td>
+          <td>有同名候选，但由于年份缺失、朝代/年份规则不足、或候选并列，程序没有强行选择。</td>
+        </tr>
+        <tr>
+          <td>未匹配且无 ambiguous 候选</td>
+          <td>6,098</td>
+          <td>基本是姓名层面没有可用 CBDB 候选的进士记录。</td>
+        </tr>
+        <tr>
+          <td>存在 ambiguous 候选的进士</td>
+          <td>5,505</td>
+          <td>候选表口径；其中少量进士同时也有另一个候选被选中，所以这个数略大于“未匹配但有 ambiguous 候选”。</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">后续清理版将在 ambiguous 表中增加 <code>jinshi_already_selected</code>：若同一个 <code>jinshi_uid</code> 已经在 selected 表中有最终匹配，则该变量为 1；否则为 0。这样可以区分“最终未匹配、需要人工处理的 ambiguous”和“已有自动匹配但仍保留其他可疑候选的 ambiguous”。</p>
+  </div>
+
+  <div class="part-divider">四、例子</div>
+
+  <div class="section" id="wangpu">
+    <h2>例子：王朴</h2>
+    <p class="section-intro">“王朴”是典型的两边都重名案例。它可以展示程序如何从 114 条姓名候选中选择自动匹配，并标出 conflict。</p>
+    <p>“王朴”在进士录中出现 6 次，在 CBDB 人物表中出现 19 次，因此姓名候选共有 <code>6 × 19 = 114</code> 条，全部属于 <code>dup_dup</code>。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>进士ID</th>
+          <th>进士年份</th>
+          <th>匹配到的 CBDB</th>
+          <th>使用规则</th>
+          <th>状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>W000009</code></td><td>950</td><td><code>40517</code>，<code>c_index_year=915</code></td><td><code>indexyear_within_50_no_cyear</code></td><td><code>selected</code></td></tr>
+        <tr><td><code>S007332</code></td><td>1109</td><td><code>35620</code>，<code>c_index_year=1144</code></td><td><code>indexyear_within_50_no_cyear</code></td><td><code>conflict</code></td></tr>
+        <tr><td><code>S030898</code></td><td>1124</td><td><code>35620</code>，<code>c_index_year=1144</code></td><td><code>indexyear_within_50_no_cyear</code></td><td><code>conflict</code></td></tr>
+        <tr><td><code>S034116</code></td><td>1112</td><td><code>35620</code>，<code>c_index_year=1144</code></td><td><code>indexyear_within_50_no_cyear</code></td><td><code>conflict</code></td></tr>
+        <tr><td><code>S034700</code></td><td>1115</td><td><code>35620</code>，<code>c_index_year=1144</code></td><td><code>indexyear_within_50_no_cyear</code></td><td><code>conflict</code></td></tr>
+        <tr><td><code>M000142</code></td><td>1385</td><td><code>66542</code>，<code>c_year=1385</code></td><td><code>cyear_exact</code></td><td><code>selected</code></td></tr>
+      </tbody>
+    </table>
+    <p class="note warn">明代王朴 <code>M000142</code> 是强匹配，因为 <code>c_year</code> 与进士年份完全相同。宋代几条王朴使用的是 <code>c_index_year</code> 兜底，而且多条进士记录共享同一个 <code>c_personid=35620</code>，因此标记为 conflict。</p>
+  </div>
+
+
+</main>
+</div>
+<script>
+  const links = Array.from(document.querySelectorAll('.toc a'));
+  const sections = links
+    .map((link) => document.querySelector(link.getAttribute('href')))
+    .filter(Boolean);
+
+  const setActive = (id) => {
+    links.forEach((link) => {
+      link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
+    });
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter((entry) => entry.isIntersecting)
+      .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+    if (visible) setActive(visible.target.id);
+  }, {
+    rootMargin: '-12% 0px -70% 0px',
+    threshold: [0.1, 0.25, 0.5]
+  });
+
+  sections.forEach((section) => observer.observe(section));
+</script>
+</body>
+</html>
