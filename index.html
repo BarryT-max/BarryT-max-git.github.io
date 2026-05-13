@@ -378,6 +378,15 @@
       font-size: 17px;
       line-height: 1.35;
     }
+    .section h3 {
+      margin: 22px 0 8px;
+      color: var(--accent);
+      font-size: 15px;
+      line-height: 1.35;
+    }
+    .section h3:first-of-type {
+      margin-top: 16px;
+    }
     .card p, .card ul, .section p, .section ul {
       margin: 0;
       color: var(--muted);
@@ -568,6 +577,7 @@
       <a href="#outputs">输出文件说明</a>
       <a href="#report">report 表说明</a>
       <a href="#ambiguous">ambiguous 和未匹配</a>
+      <a href="#main-table-vars">主表变量解释</a>
       <div class="toc-group">四、例子</div>
       <a href="#wangpu">例子：王朴</a>
     </nav>
@@ -968,6 +978,79 @@
       </tbody>
     </table>
     <p class="note">后续清理版将在 ambiguous 表中增加 <code>jinshi_already_selected</code>：若同一个 <code>jinshi_uid</code> 已经在 selected 表中有最终匹配，则该变量为 1；否则为 0。这样可以区分“最终未匹配、需要人工处理的 ambiguous”和“已有自动匹配但仍保留其他可疑候选的 ambiguous”。</p>
+  </div>
+
+  <div class="section" id="main-table-vars">
+    <h2>主表变量解释</h2>
+    <p class="section-intro">这一节说明最终进士主表中建议阅读和保留的核心变量。变量分为三组：进士录原始/清洗字段、贴回来的 CBDB 字段、最终匹配判断字段。</p>
+
+    <h3>一、进士录原始/清洗字段</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>变量</th>
+          <th>含义</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>jinshi_uid</code></td><td>程序生成的唯一行号，方便 merge 和追踪。</td></tr>
+        <tr><td><code>jinshi_id</code></td><td>进士录原始序号。</td></tr>
+        <tr><td><code>match_name</code></td><td>清洗后的进士姓名。</td></tr>
+        <tr><td><code>jinshi_year</code></td><td>进士录公元年。</td></tr>
+        <tr><td><code>jinshi_dynasty_raw</code></td><td>进士录朝榜。</td></tr>
+        <tr><td><code>jinshi_dy</code></td><td>映射后的朝代代码，用于匹配解释。</td></tr>
+        <tr><td><code>jinshi_emperor</code></td><td>帝王。</td></tr>
+        <tr><td><code>jinshi_surname_first</code></td><td>姓名首字。</td></tr>
+        <tr><td><code>jinshi_origin</code></td><td>生源。</td></tr>
+        <tr><td><code>jinshi_subject</code></td><td>科目。</td></tr>
+        <tr><td><code>X_COORD</code>, <code>Y_COORD</code>, <code>_区县</code>, <code>_县级码</code>, <code>_X_COORD</code>, <code>_Y_COORD</code></td><td>原进士地理字段。</td></tr>
+      </tbody>
+    </table>
+
+    <h3>二、贴回来的 CBDB 字段</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>变量</th>
+          <th>含义</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>c_personid</code></td><td>匹配到的 CBDB 人物 ID。</td></tr>
+        <tr><td><code>cbdb_name</code></td><td>CBDB 姓名。</td></tr>
+        <tr><td><code>c_year</code></td><td>CBDB 进士相关 entry 年份。</td></tr>
+        <tr><td><code>c_index_year</code></td><td>CBDB 核心活动/定位年份。</td></tr>
+        <tr><td><code>c_dy</code></td><td>CBDB 朝代代码。</td></tr>
+        <tr><td><code>c_entry_code</code></td><td>使用到的 entry code。</td></tr>
+        <tr><td><code>c_sequence</code></td><td>CBDB entry 顺序。</td></tr>
+        <tr><td><code>c_exam_rank</code></td><td>考试名次。</td></tr>
+        <tr><td><code>entry_notes</code></td><td>CBDB entry 备注。</td></tr>
+      </tbody>
+    </table>
+
+    <h3>三、最终匹配判断字段</h3>
+    <p class="section-intro">这些字段用于解释匹配质量，是判断自动匹配、冲突和强匹配口径的关键依据。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>变量</th>
+          <th>含义</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>jinshi_has_cbdb_match</code></td><td>是否贴上 CBDB。</td></tr>
+        <tr><td><code>final_match_status</code></td><td><code>selected</code> / <code>conflict</code> / <code>unmatched</code>。</td></tr>
+        <tr><td><code>strong_match</code></td><td>非 conflict 的强匹配。</td></tr>
+        <tr><td><code>name_match_type</code></td><td>姓名匹配类型。</td></tr>
+        <tr><td><code>match_round</code></td><td>匹配轮次。</td></tr>
+        <tr><td><code>match_rule</code></td><td>匹配规则。</td></tr>
+        <tr><td><code>year_source</code></td><td>年份证据来源。</td></tr>
+        <tr><td><code>diff_cyear</code></td><td>进士年份与 <code>c_year</code> 差值。</td></tr>
+        <tr><td><code>diff_indexyear</code></td><td>进士年份与 <code>c_index_year</code> 差值。</td></tr>
+        <tr><td><code>cbdb_multi_jinshi_conflict</code></td><td>是否一位 CBDB 对多个进士。</td></tr>
+        <tr><td><code>cbdb_selected_jinshi_count</code></td><td>此 CBDB 被多少条进士记录选中。</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="part-divider">四、例子</div>
